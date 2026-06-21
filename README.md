@@ -40,7 +40,7 @@ backend (Flask :5000)
 
 ## Prerequisites
 
-- **Python 3.10+** (3.11 recommended)
+- **Python 3.11 or 3.12** (required — TensorFlow does **not** support Python 3.13+)
 - **Node.js 18+**
 - **npm**
 
@@ -179,7 +179,61 @@ pneumonia/
 └── README.md
 ```
 
-## Production deployment notes
+## Deploy online (Vercel + Render)
+
+**Important:** Vercel can host your **frontend only**. The Flask + TensorFlow backend is too large for Vercel serverless and will fail with Python/TensorFlow errors. Host the backend on **Render** (free tier).
+
+### Step 1 — Deploy backend on Render
+
+1. Push your repo to GitHub
+2. Go to [render.com](https://render.com) → **New → Blueprint** (or Web Service)
+3. Connect your GitHub repo
+4. Use these settings:
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `backend` |
+| Runtime | Python 3.11 |
+| Build Command | `pip install -r requirements.txt && python scripts/bootstrap_model.py` |
+| Start Command | `gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 app:app` |
+
+5. Add environment variable:
+   ```
+   CORS_ORIGINS=https://your-app.vercel.app
+   ```
+   (Update after Vercel deploy with your real Vercel URL)
+
+6. Copy your Render URL, e.g. `https://pneumodetect-api.onrender.com`
+
+### Step 2 — Deploy frontend on Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project**
+2. Import your GitHub repo
+3. Set **Root Directory** to `frontend` (not the repo root)
+4. Vercel should auto-detect **Vite**
+5. Add environment variable:
+
+   | Name | Value |
+   |------|-------|
+   | `VITE_API_URL` | `https://your-backend.onrender.com/api` |
+
+6. Click **Deploy**
+
+### Step 3 — Connect them
+
+1. Copy your Vercel URL (e.g. `https://pneumodetect.vercel.app`)
+2. In Render, update `CORS_ORIGINS` to that URL
+3. Redeploy Render if needed
+
+### Common Vercel mistakes
+
+| Mistake | Result |
+|---------|--------|
+| Root Directory = repo root | Tries to install Python/TensorFlow → **fails** |
+| Root Directory = `backend` | TensorFlow too big for Vercel → **fails** |
+| Root Directory = `frontend` | Works |
+
+## Production deployment notes (local)
 
 **Backend (Gunicorn):**
 

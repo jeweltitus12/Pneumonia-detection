@@ -95,6 +95,13 @@ def main() -> None:
     model.fit(train_data, epochs=12, verbose=1)
     model.save(str(MODEL_OUTPUT))
 
+    # Export lightweight TFLite model for production (Render/Vercel backends)
+    try:
+        import subprocess
+        subprocess.run([sys.executable, str(BACKEND_DIR / "scripts" / "export_tflite.py")], check=True)
+    except Exception as exc:
+        print(f"Warning: TFLite export failed ({exc}). Run scripts/export_tflite.py manually.")
+
     shutil.rmtree(dataset_dir, ignore_errors=True)
     print(f"Bootstrap model saved to {MODEL_OUTPUT}")
 

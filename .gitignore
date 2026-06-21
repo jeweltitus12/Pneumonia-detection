@@ -16,7 +16,7 @@ backend/.pytest_cache/
 backend/database.db
 backend/uploads/
 
-# Model weights (large binary files)
+# Model weights (large binary files — keep .tflite for production deploy)
 backend/weights/*.h5
 backend/weights/*.keras
 

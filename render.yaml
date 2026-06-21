@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pneumodetect-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: MODEL_PATH
+        value: weights/pneumonia_model.tflite
+      - key: CORS_ORIGINS
+        sync: false

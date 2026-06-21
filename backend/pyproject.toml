@@ -1,0 +1,9 @@
+[project]
+name = "pneumonia-backend"
+version = "1.0.0"
+requires-python = ">=3.11,<3.13"
+description = "Flask API for pneumonia detection from chest X-rays"
+
+[tool.uv]
+# TensorFlow 2.16.x does not support Python 3.13+ yet.
+python-preference = "managed"
