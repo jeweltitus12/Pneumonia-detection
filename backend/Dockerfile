@@ -21,9 +21,11 @@ WORKDIR $HOME/app
 # Copy all backend files into the container
 COPY --chown=user . $HOME/app
 
+# Ensure Python finds the app's modules
+ENV PYTHONPATH=$HOME/app
+
 # Hugging Face Spaces absolutely requires port 7860
 EXPOSE 7860
 
-# Start your Flask app using Gunicorn or python command 
-# (Make sure your app runs on host 0.0.0.0 and port 7860)
+# Start your Flask app
 CMD ["python", "app.py"]
