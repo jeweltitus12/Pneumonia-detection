@@ -43,7 +43,5 @@ def _warmup_model() -> None:
 _warmup_model()
 
 if __name__ == "__main__":
-    # Default to 7860 for Hugging Face Spaces; 5000 for local dev
-    port = int(os.environ.get("PORT", 7860))
-    debug = os.environ.get("FLASK_DEBUG", "true").lower() == "true"
-    app.run(debug=debug, port=port, host="0.0.0.0")
+    # Crucial for Hugging Face: host must be 0.0.0.0 and port must be 7860
+    app.run(host="0.0.0.0", port=7860, debug=False)
