@@ -3,23 +3,34 @@ import os
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_MODEL_PATH = BASE_DIR / "weights" / "pneumonia_model.h5"
+DEFAULT_MODEL_PATH = BASE_DIR / "weights" / "pneumonia_model.tflite"
 _env_model_path = os.environ.get("MODEL_PATH")
 if _env_model_path:
     _path = Path(_env_model_path)
     MODEL_PATH = _path if _path.is_absolute() else BASE_DIR / _path
 else:
     MODEL_PATH = DEFAULT_MODEL_PATH
+
 IMAGE_SIZE = (224, 224)
 
-_model = None
+_interpreter = None
 _model_load_error = None
+
+
+def _get_interpreter():
+    try:
+        from tflite_runtime.interpreter import Interpreter
+    except ImportError:
+        import tensorflow as tf
+
+        Interpreter = tf.lite.Interpreter  # local dev fallback
+
+    return Interpreter
 
 
 def _preprocess_image(image_path: str) -> np.ndarray:
@@ -31,24 +42,26 @@ def _preprocess_image(image_path: str) -> np.ndarray:
 
 
 def load_model(force_reload: bool = False):
-    """Load the Keras model once and cache it in memory."""
-    global _model, _model_load_error
+    """Load the TFLite model once and cache it in memory."""
+    global _interpreter, _model_load_error
 
-    if _model is not None and not force_reload:
-        return _model
+    if _interpreter is not None and not force_reload:
+        return _interpreter
 
     if not MODEL_PATH.exists():
         _model_load_error = (
             f"Model file not found at {MODEL_PATH}. "
-            "Run `python scripts/train_model.py` or `python scripts/download_model.py` first."
+            "Run `python scripts/export_tflite.py` locally, then commit the .tflite file."
         )
         raise FileNotFoundError(_model_load_error)
 
     try:
-        _model = tf.keras.models.load_model(str(MODEL_PATH))
+        Interpreter = _get_interpreter()
+        _interpreter = Interpreter(model_path=str(MODEL_PATH))
+        _interpreter.allocate_tensors()
         _model_load_error = None
         logger.info("Loaded pneumonia model from %s", MODEL_PATH)
-        return _model
+        return _interpreter
     except Exception as exc:
         _model_load_error = f"Failed to load model: {exc}"
         raise RuntimeError(_model_load_error) from exc
@@ -56,7 +69,7 @@ def load_model(force_reload: bool = False):
 
 def get_model_status() -> dict:
     """Return model availability for health checks."""
-    if _model is not None:
+    if _interpreter is not None:
         return {"loaded": True, "path": str(MODEL_PATH), "error": None}
 
     if MODEL_PATH.exists():
@@ -76,11 +89,16 @@ def predict_image(image_path: str) -> tuple[str, float]:
     Returns:
         Tuple of (prediction label, confidence percentage).
     """
-    model = load_model()
+    interpreter = load_model()
     batch = _preprocess_image(image_path)
-    raw_prediction = model.predict(batch, verbose=0)
 
-    # Support scalar, vector, and multi-class outputs.
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    interpreter.set_tensor(input_details[0]["index"], batch)
+    interpreter.invoke()
+    raw_prediction = interpreter.get_tensor(output_details[0]["index"])
+
     if raw_prediction.ndim == 2 and raw_prediction.shape[1] > 1:
         pneumonia_score = float(raw_prediction[0][1])
     else:
