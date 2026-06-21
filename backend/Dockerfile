@@ -1,18 +1,29 @@
-FROM python:3.11-slim
+# Use an official lightweight Python image
+FROM python:3.10-slim
 
-WORKDIR /app
+# Set the working directory inside the container
+WORKDIR /code
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements first to leverage Docker cache
+COPY ./requirements.txt /code/requirements.txt
 
-COPY . .
+# Install dependencies (using --no-cache-dir keeps the image smaller)
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-RUN mkdir -p uploads weights
+# Create a non-root user for security (required by Hugging Face)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
+WORKDIR $HOME/app
+
+# Copy all backend files into the container
+COPY --chown=user . $HOME/app
+
+# Hugging Face Spaces absolutely requires port 7860
 EXPOSE 7860
 
-ENV PORT=7860
-ENV FLASK_DEBUG=false
-ENV MODEL_PATH=weights/pneumonia_model.tflite
-
-CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:7860", "--timeout", "120", "app:app"]
+# Start your Flask app using Gunicorn or python command 
+# (Make sure your app runs on host 0.0.0.0 and port 7860)
+CMD ["python", "app.py"]
