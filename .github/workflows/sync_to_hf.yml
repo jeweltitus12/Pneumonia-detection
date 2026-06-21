@@ -17,7 +17,17 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Push backend to Hugging Face Space
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Configure Git for HF push
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
