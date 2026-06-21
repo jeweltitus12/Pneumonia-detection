@@ -1,0 +1,25 @@
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+frontend/*.local
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/.pytest_cache/
+
+# Database & Uploads
+backend/database.db
+backend/uploads/
+
+# Model weights (large binary files)
+backend/weights/*.h5
+backend/weights/*.keras
+
+# OS specific
+.DS_Store
+Thumbs.db
