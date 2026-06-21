@@ -17,18 +17,32 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Setup Git LFS
-        run: |
-          git lfs install
-          git lfs pull
+      - name: Pull LFS files
+        run: git lfs pull
 
-      - name: Configure Git for HF push
-        run: |
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "GitHub Actions"
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-      - name: Push to Hugging Face Space
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Upload backend folder to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://jeweltitus12:$HF_TOKEN@huggingface.co/spaces/jeweltitus12/pneumonia-detection master
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi()
+          api.upload_folder(
+              folder_path="backend",
+              repo_id="jeweltitus12/pneumonia-detection",
+              repo_type="space",
+              token=os.environ["HF_TOKEN"],
+              ignore_patterns=["venv/*", "__pycache__/*", "*.pyc", ".env", "uploads/*", "database.db"],
+          )
+          print("Upload complete!")
+          EOF
