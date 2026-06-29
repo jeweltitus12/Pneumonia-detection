@@ -52,7 +52,7 @@ def build_model() -> tf.keras.Model:
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
         loss="binary_crossentropy",
-        metrics=["accuracy"],
+        metrics=["accuracy", tf.keras.metrics.AUC(name="auc")],
     )
     return model
 
@@ -126,21 +126,37 @@ def main() -> None:
 
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    train_dir = args.dataset / "train"
+    n_normal = len(list((train_dir / "NORMAL").glob("*"))) if (train_dir / "NORMAL").exists() else 0
+    n_pneumonia = len(list((train_dir / "PNEUMONIA").glob("*"))) if (train_dir / "PNEUMONIA").exists() else 0
+    if n_normal > 0 and n_pneumonia > 0:
+        total = n_normal + n_pneumonia
+        class_weight = {0: total / (2.0 * n_normal), 1: total / (2.0 * n_pneumonia)}
+        print(f"Training set: {n_normal} NORMAL, {n_pneumonia} PNEUMONIA")
+        print(f"Class weights: NORMAL={class_weight[0]:.2f}, PNEUMONIA={class_weight[1]:.2f}")
+    else:
+        class_weight = None
+
     print(f"Using dataset: {args.dataset}")
     train_data, val_data, test_data = create_generators(args.dataset)
 
     model = build_model()
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
-            monitor="val_loss",
-            patience=2,
+            monitor="val_auc",
+            patience=3,
             restore_best_weights=True,
+            mode="max",
         ),
         tf.keras.callbacks.ModelCheckpoint(
             filepath=str(MODEL_OUTPUT),
-            monitor="val_accuracy",
+            monitor="val_auc",
             save_best_only=True,
+            mode="max",
             verbose=1,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5, patience=2, min_lr=1e-6, verbose=1
         ),
     ]
 
@@ -148,12 +164,14 @@ def main() -> None:
         train_data,
         validation_data=val_data,
         epochs=args.epochs,
+        class_weight=class_weight,
         callbacks=callbacks,
     )
 
     if test_data is not None:
-        loss, accuracy = model.evaluate(test_data)
-        print(f"Test loss: {loss:.4f}, Test accuracy: {accuracy:.4f}")
+        results = model.evaluate(test_data)
+        for name, val in zip(model.metrics_names, results):
+            print(f"Test {name}: {val:.4f}")
 
     model.save(str(MODEL_OUTPUT))
     print(f"Model saved to {MODEL_OUTPUT}")

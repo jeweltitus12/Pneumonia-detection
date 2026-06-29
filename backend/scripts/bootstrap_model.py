@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 import tensorflow as tf
+import numpy as np
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BACKEND_DIR / "uploads"
@@ -23,11 +24,15 @@ MODEL_OUTPUT = WEIGHTS_DIR / "pneumonia_model.h5"
 IMAGE_SIZE = (224, 224)
 
 
-def _collect_bootstrap_dataset() -> Path | None:
+def _collect_bootstrap_dataset() -> tuple[Path, int, int] | None:
     if not UPLOADS_DIR.exists():
         return None
 
-    images = list(UPLOADS_DIR.glob("*.jpeg")) + list(UPLOADS_DIR.glob("*.jpg")) + list(UPLOADS_DIR.glob("*.png"))
+    images = (
+        list(UPLOADS_DIR.glob("*.jpeg"))
+        + list(UPLOADS_DIR.glob("*.jpg"))
+        + list(UPLOADS_DIR.glob("*.png"))
+    )
     if not images:
         return None
 
@@ -35,11 +40,27 @@ def _collect_bootstrap_dataset() -> Path | None:
     for label in ("NORMAL", "PNEUMONIA"):
         (temp_root / label).mkdir(parents=True, exist_ok=True)
 
+    n_normal = 0
+    n_pneumonia = 0
     for image_path in images:
+        # Skip UUID-prefixed uploads (user-uploaded at runtime, not training data)
+        if len(image_path.stem.split("_")[0]) == 32:
+            continue
         label = "PNEUMONIA" if "virus" in image_path.name.lower() else "NORMAL"
         shutil.copy2(image_path, temp_root / label / image_path.name)
+        if label == "NORMAL":
+            n_normal += 1
+        else:
+            n_pneumonia += 1
 
-    return temp_root
+    print(f"Bootstrap dataset: {n_normal} NORMAL, {n_pneumonia} PNEUMONIA")
+
+    if n_normal == 0 or n_pneumonia == 0:
+        print("ERROR: Need at least one image per class. Check uploads/ folder.")
+        shutil.rmtree(temp_root, ignore_errors=True)
+        sys.exit(1)
+
+    return temp_root, n_normal, n_pneumonia
 
 
 def _build_model() -> tf.keras.Model:
@@ -54,33 +75,44 @@ def _build_model() -> tf.keras.Model:
     x = tf.keras.layers.Rescaling(1.0 / 255.0)(inputs)
     x = base_model(x, training=True)
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
     outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
 
     model = tf.keras.Model(inputs, outputs)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
         loss="binary_crossentropy",
-        metrics=["accuracy"],
+        metrics=["accuracy", tf.keras.metrics.AUC(name="auc")],
     )
     return model
 
 
 def main() -> None:
-    dataset_dir = _collect_bootstrap_dataset()
-    if dataset_dir is None:
+    result = _collect_bootstrap_dataset()
+    if result is None:
         print("No bootstrap images found in backend/uploads.")
         print("Place sample X-rays there or run scripts/train_model.py with the full dataset.")
         sys.exit(1)
 
+    dataset_dir, n_normal, n_pneumonia = result
+
+    # Compute class weights to counter imbalance (NORMAL gets higher weight if fewer)
+    total = n_normal + n_pneumonia
+    class_weight = {
+        0: total / (2.0 * n_normal),      # index 0 = NORMAL (alphabetical)
+        1: total / (2.0 * n_pneumonia),   # index 1 = PNEUMONIA
+    }
+    print(f"Class weights: NORMAL={class_weight[0]:.2f}, PNEUMONIA={class_weight[1]:.2f}")
+
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
     datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        zoom_range=0.2,
+        rotation_range=15,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.1,
         horizontal_flip=True,
+        brightness_range=[0.8, 1.2],
     )
 
     train_data = datagen.flow_from_directory(
@@ -92,13 +124,21 @@ def main() -> None:
     )
 
     model = _build_model()
-    model.fit(train_data, epochs=12, verbose=1)
+    model.fit(
+        train_data,
+        epochs=15,
+        class_weight=class_weight,
+        verbose=1,
+    )
     model.save(str(MODEL_OUTPUT))
 
-    # Export lightweight TFLite model for production (Render/Vercel backends)
+    # Export lightweight TFLite model for production
     try:
         import subprocess
-        subprocess.run([sys.executable, str(BACKEND_DIR / "scripts" / "export_tflite.py")], check=True)
+        subprocess.run(
+            [sys.executable, str(BACKEND_DIR / "scripts" / "export_tflite.py")],
+            check=True,
+        )
     except Exception as exc:
         print(f"Warning: TFLite export failed ({exc}). Run scripts/export_tflite.py manually.")
 
