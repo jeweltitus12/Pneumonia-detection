@@ -106,10 +106,9 @@ def predict_image(image_path: str) -> tuple[str, float]:
 
     pneumonia_score = float(np.clip(pneumonia_score, 0.0, 1.0))
 
-    # Threshold of 0.65 requires high confidence before calling Pneumonia.
-    # This reduces false positives on normal X-rays from a bootstrap-trained model.
-    # Use 0.5 when trained on the full Kaggle dataset for balanced performance.
-    PNEUMONIA_THRESHOLD = float(os.environ.get("PNEUMONIA_THRESHOLD", "0.65"))
+    # Default 0.5 threshold works well when trained on the full Kaggle dataset.
+    # Raise to 0.6-0.7 to reduce false positives; lower to 0.4 to reduce false negatives.
+    PNEUMONIA_THRESHOLD = float(os.environ.get("PNEUMONIA_THRESHOLD", "0.5"))
 
     if pneumonia_score >= PNEUMONIA_THRESHOLD:
         return "Pneumonia", round(pneumonia_score * 100, 2)
