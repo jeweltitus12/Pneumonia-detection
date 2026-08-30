@@ -16,8 +16,8 @@ backend/.pytest_cache/
 backend/database.db
 backend/uploads/
 
-# Model weights (large binary files — keep .tflite for production deploy)
-backend/weights/*.h5
+# Model weights (MobileNet Keras file stays local; other .h5 files are Git LFS)
+backend/weights/pneumonia_model.h5
 backend/weights/*.keras
 
 # OS specific
