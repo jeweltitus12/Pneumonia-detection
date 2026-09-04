@@ -1,0 +1,4 @@
+# Local development & model training only — do NOT use on Render
+-r requirements.txt
+tensorflow==2.16.1
+scipy==1.13.1

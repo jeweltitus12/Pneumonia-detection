@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start PneumoDetect",
+      "dependsOn": ["Start backend", "Start frontend"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "Start backend",
+      "type": "shell",
+      "command": "${workspaceFolder}\\backend\\start_backend.bat",
+      "options": {
+        "cwd": "${workspaceFolder}\\backend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "pneumodetect"
+      },
+      "problemMatcher": {
+        "owner": "pneumodetect-backend",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "(Serving Flask|model loaded|Address already in use|already running with model loaded)"
+        }
+      }
+    },
+    {
+      "label": "Start frontend",
+      "type": "shell",
+      "command": "${workspaceFolder}\\frontend\\start_frontend.bat",
+      "options": {
+        "cwd": "${workspaceFolder}\\frontend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "pneumodetect"
+      },
+      "problemMatcher": {
+        "owner": "pneumodetect-frontend",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "(Local:|already in use)"
+        }
+      }
+    }
+  ]
+}

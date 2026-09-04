@@ -1,0 +1,25 @@
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+frontend/*.local
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/.pytest_cache/
+
+# Database & Uploads
+backend/database.db
+backend/uploads/
+
+# Model weights (MobileNet Keras file stays local; other .h5 files are Git LFS)
+backend/weights/pneumonia_model.h5
+backend/weights/*.keras
+
+# OS specific
+.DS_Store
+Thumbs.db

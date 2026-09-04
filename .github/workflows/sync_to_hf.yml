@@ -1,0 +1,48 @@
+name: Sync Backend to Hugging Face Spaces
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Pull LFS files
+        run: git lfs pull
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Upload backend folder to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi()
+          api.upload_folder(
+              folder_path="backend",
+              repo_id="jeweltitus12/pneumonia-detection",
+              repo_type="space",
+              token=os.environ["HF_TOKEN"],
+              ignore_patterns=["venv/*", "__pycache__/*", "*.pyc", ".env", "uploads/*", "database.db"],
+          )
+          print("Upload complete!")
+          EOF

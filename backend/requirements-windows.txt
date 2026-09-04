@@ -1,0 +1,8 @@
+# Windows local development (tflite-runtime is Linux-only; use TensorFlow instead)
+Flask==3.0.3
+Flask-CORS==4.0.1
+Pillow==10.3.0
+numpy==1.26.4
+python-dotenv==1.0.1
+requests==2.32.3
+tensorflow==2.16.1

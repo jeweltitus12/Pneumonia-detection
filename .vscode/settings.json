@@ -1,0 +1,5 @@
+{
+  "python.defaultInterpreterPath": "${env:LOCALAPPDATA}\\Programs\\Python\\Python311\\python.exe",
+  "python.terminal.activateEnvironment": false,
+  "task.allowAutomaticTasks": "on"
+}
