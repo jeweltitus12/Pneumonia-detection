@@ -1,0 +1,6 @@
+{
+  "MobileNetV2": 0.4,
+  "DenseNet121": 0.4,
+  "ResNet50": 0.4,
+  "EfficientNetB0": 0.4
+}

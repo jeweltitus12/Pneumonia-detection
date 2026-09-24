@@ -16,6 +16,10 @@ backend/.pytest_cache/
 backend/database.db
 backend/uploads/
 
+# External datasets (Bhopal / Mendeley, etc.)
+backend/datasets/
+backend/reports/
+
 # Model weights (MobileNet Keras file stays local; other .h5 files are Git LFS)
 backend/weights/pneumonia_model.h5
 backend/weights/*.keras

@@ -34,16 +34,27 @@ def _require_tensorflow():
 
 
 def resolve_grad_cam_layer(model, model_name: str):
-    """Resolve the architecture-specific final conv layer inside `backbone`."""
+    """Resolve the final convolutional layer in current or legacy saved models."""
     name = normalize_model_name(model_name)
     configured_layer = get_grad_cam_layer(name)
 
     try:
         backbone = model.get_layer("backbone")
-    except ValueError as exc:
-        raise GradCamError(
-            f"Model {name} is missing the expected 'backbone' layer for Grad-CAM."
-        ) from exc
+    except ValueError:
+        backbone = None
+        for layer in model.layers:
+            if hasattr(layer, "get_layer"):
+                try:
+                    layer.get_layer(configured_layer)
+                    backbone = layer
+                    break
+                except ValueError:
+                    continue
+        if backbone is None:
+            raise GradCamError(
+                f"Model {name} does not contain the configured Grad-CAM layer "
+                f"'{configured_layer}'."
+            )
 
     try:
         return backbone.get_layer(configured_layer)

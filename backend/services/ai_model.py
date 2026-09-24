@@ -7,6 +7,7 @@ from PIL import Image
 
 from services.model_registry import (
     AVAILABLE_MODELS,
+    get_decision_threshold,
     get_image_size,
     get_weights_path,
     normalize_model_name,
@@ -251,8 +252,8 @@ def _score_from_raw(raw_prediction) -> float:
     return float(np.clip(pneumonia_score, 0.0, 1.0))
 
 
-def _labels_from_score(pneumonia_score: float) -> tuple[str, float]:
-    PNEUMONIA_THRESHOLD = float(os.environ.get("PNEUMONIA_THRESHOLD", "0.5"))
+def _labels_from_score(pneumonia_score: float, model_name: str | None = None) -> tuple[str, float]:
+    PNEUMONIA_THRESHOLD = get_decision_threshold(model_name)
     if pneumonia_score >= PNEUMONIA_THRESHOLD:
         return "Pneumonia", round(pneumonia_score * 100, 2)
     return "Normal", round((1.0 - pneumonia_score) * 100, 2)
@@ -268,7 +269,7 @@ def _predict_tflite(image_path: str) -> tuple[str, float]:
     interpreter.set_tensor(input_details[0]["index"], batch)
     interpreter.invoke()
     raw_prediction = interpreter.get_tensor(output_details[0]["index"])
-    return _labels_from_score(_score_from_raw(raw_prediction))
+    return _labels_from_score(_score_from_raw(raw_prediction), "MobileNetV2")
 
 
 def _is_tflite_handle(model) -> bool:
@@ -322,4 +323,4 @@ def predict_image(image_path: str, model_name: str | None = None) -> tuple[str, 
 
     batch = _preprocess_image(image_path, get_image_size(name))
     raw_prediction = model.predict(batch, verbose=0)
-    return _labels_from_score(_score_from_raw(raw_prediction))
+    return _labels_from_score(_score_from_raw(raw_prediction), name)

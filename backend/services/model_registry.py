@@ -16,7 +16,7 @@ MODEL_REGISTRY: dict[str, dict] = {
         "image_size": (224, 224),
         "weights_filename": MOBILENET_H5,
         "tflite_filename": MOBILENET_TFLITE,
-        "preprocess": "rescale",
+        "preprocess": "mobilenet_v2",
         "grad_cam_layer": "block_16_project",
     },
     "DenseNet121": {
@@ -31,7 +31,7 @@ MODEL_REGISTRY: dict[str, dict] = {
         "weights_filename": "resnet50.h5",
         "tflite_filename": None,
         "preprocess": "resnet",
-        "grad_cam_layer": "conv5_block3_3_conv3",
+        "grad_cam_layer": "conv5_block3_3_conv",
     },
     "EfficientNetB0": {
         "image_size": (224, 224),
@@ -98,3 +98,34 @@ def get_image_size(model_name: str) -> tuple[int, int]:
 
 def get_grad_cam_layer(model_name: str) -> str:
     return get_registry_entry(model_name)["grad_cam_layer"]
+
+
+def get_decision_threshold(model_name: str | None = None) -> float:
+    """Return the validation-chosen threshold for a model, else the env default.
+
+    Thresholds are written by scripts/train_improved.py after a validation-only
+    search. They are not tuned on the test set.
+    """
+    import json
+    import os
+
+    default = float(os.environ.get("PNEUMONIA_THRESHOLD", "0.5"))
+    if not model_name:
+        return default
+
+    path = WEIGHTS_DIR / "thresholds.json"
+    if not path.exists():
+        return default
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        name = normalize_model_name(model_name)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return default
+
+    entry = data.get(name)
+    if isinstance(entry, (int, float)):
+        return float(entry)
+    if isinstance(entry, dict) and isinstance(entry.get("threshold"), (int, float)):
+        return float(entry["threshold"])
+    return default

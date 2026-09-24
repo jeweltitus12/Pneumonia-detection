@@ -1,9 +1,9 @@
 """
 Reusable transfer-learning builders for pneumonia binary classification.
 
-MobileNetV2 keeps the original Rescaling(1/255) head so existing
-weights/pneumonia_model.h5 and pneumonia_model.tflite stay compatible.
-Other architectures use Keras ImageNet preprocess_input inside the graph.
+Each architecture applies its own Keras preprocess_input inside the graph
+(MobileNetV2 scales to [-1, 1]; the others use their ImageNet preprocess).
+Training and inference both feed raw 0–255 RGB tensors.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import tensorflow as tf
-from tensorflow.keras.applications import densenet, efficientnet, inception_v3, resnet, vgg16
+from tensorflow.keras.applications import densenet, efficientnet, inception_v3, mobilenet_v2, resnet, vgg16
 
 from services.model_registry import (
     AVAILABLE_MODELS,
@@ -59,6 +59,7 @@ _CONSTRUCTORS = {
 }
 
 _PREPROCESS_FNS = {
+    "mobilenet_v2": mobilenet_v2.preprocess_input,
     "densenet": densenet.preprocess_input,
     "resnet": resnet.preprocess_input,
     "efficientnet": efficientnet.preprocess_input,
@@ -130,7 +131,6 @@ def build_transfer_model(
 
     base_model = _build_backbone(spec, input_shape)
     base_model.trainable = trainable_base
-    base_model._name = "backbone"
 
     inputs = tf.keras.Input(shape=input_shape, name="image")
     x = _apply_preprocess(inputs, spec)
@@ -146,14 +146,17 @@ def build_transfer_model(
 
 def compile_classifier(model: tf.keras.Model, learning_rate: float = 1e-4) -> None:
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0),
         loss="binary_crossentropy",
         metrics=["accuracy", tf.keras.metrics.AUC(name="auc")],
     )
 
 
 def get_backbone(model: tf.keras.Model) -> tf.keras.Model:
-    return model.get_layer("backbone")
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.Model):
+            return layer
+    raise ValueError("No nested backbone found in the classifier.")
 
 
 def unfreeze_top_layers(model: tf.keras.Model, num_layers: int = 30) -> None:
@@ -162,3 +165,7 @@ def unfreeze_top_layers(model: tf.keras.Model, num_layers: int = 30) -> None:
     freeze_until = max(len(backbone.layers) - num_layers, 0)
     for layer in backbone.layers[:freeze_until]:
         layer.trainable = False
+    # Keep BatchNorm in inference mode so fine-tuning does not chase noisy stats.
+    for layer in backbone.layers[freeze_until:]:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False

@@ -82,6 +82,38 @@ python scripts/train_model.py --dataset path\to\chest_xray
 
 This saves the trained model to `backend/weights/pneumonia_model.h5`.
 
+### External validation (Bhopal / VIT Bhopal)
+
+To measure how well the **existing Kaggle-trained models** generalize to an Indian cohort, use the [VIT Bhopal / Bhopal chest radiograph dataset on Mendeley](https://data.mendeley.com/datasets/kpg5yz77gj/1) (DOI `10.17632/kpg5yz77gj.1`) — **504 images** (204 Normal, 300 Pneumonia). This is **evaluation only**; it does not retrain or overwrite weights.
+
+Organize images as:
+
+```text
+backend/datasets/bhopal_chest_xray/
+  NORMAL/
+  PNEUMONIA/
+```
+
+Then run:
+
+```powershell
+cd backend
+python scripts/evaluate_external.py --dataset datasets\bhopal_chest_xray --model all
+```
+
+Metrics (accuracy, precision, recall, F1, AUC, confusion matrix) are printed and saved to `backend/reports/bhopal_external_validation.json`.
+
+### Retrain with a held-out 70/15/15 split
+
+`scripts/train_improved.py` pools the Kaggle `train`, `val`, and `test` folders (the official `val` folder has only 16 images), then makes one stratified split: 70% train, 15% validation, 15% test. The test split is not used to pick learning rate, dropout, early stopping, or the decision threshold. Each model uses its own ImageNet `preprocess_input`, mild chest X-ray augmentation, class weights, a frozen-head stage, then fine-tuning of the later backbone layers.
+
+```powershell
+cd backend
+python scripts/train_improved.py --dataset "C:\Users\jewel\OneDrive\Scans\chest_xray" --model all
+```
+
+Held-out test metrics and graphs are written to `backend/reports/improved_training/`. Validation-chosen thresholds are saved to `backend/weights/thresholds.json` and used at inference.
+
 ### 4. Start the backend
 
 ```powershell
@@ -163,9 +195,12 @@ pneumonia/
 │   ├── services/ai_model.py   # Model loading & inference
 │   ├── models/database.py     # SQLite helpers
 │   ├── scripts/
-│   │   ├── bootstrap_model.py # Quick dev model trainer
-│   │   └── train_model.py     # Full dataset trainer
-│   ├── weights/               # Saved model (.h5)
+│   │   ├── bootstrap_model.py     # Quick dev model trainer
+│   │   ├── train_model.py         # Full dataset trainer
+│   │   └── evaluate_external.py   # External validation (e.g. Bhopal)
+│   ├── datasets/              # External datasets (gitignored)
+│   ├── reports/               # Eval JSON reports (gitignored)
+│   ├── weights/               # Saved model (.h5 / .tflite)
 │   ├── uploads/               # Uploaded X-rays
 │   └── requirements.txt
 ├── frontend/
